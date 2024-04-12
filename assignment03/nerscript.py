@@ -1,17 +1,18 @@
 import logging
 import spacy
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, explode, col, udf
+from pyspark.sql.functions import from_json, explode, col, udf, to_json
 from pyspark.sql.types import StringType, StructType, StructField, ArrayType
 
 # Initialize logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 # Initialize spaCy NLP model
 nlp = spacy.load("en_core_web_sm")
 
 spark = SparkSession.builder \
     .appName("NERStreamProcessor") \
+    .config("spark.streaming.uninterruptible", "true") \
     .getOrCreate()
 
 # Define the schema for the incoming Kafka messages
@@ -22,8 +23,10 @@ schema = StructType([
 
 # Function to perform NER using spaCy
 def perform_ner_spacy(text):
+    if text is None:
+        return []
     doc = nlp(text)
-    entities = [ent.text for ent in doc.ents]
+    entities = [ent.text for ent in doc.ents if ent.text.strip()]
     return entities
 
 # Define the udf
@@ -44,12 +47,13 @@ df_parsed = df.selectExpr("CAST(value AS STRING)") \
 
 # Perform NER and explode the entities
 df_ner = df_parsed.withColumn("entities", explode(perform_ner_udf(col("news")))) \
+    .filter(col("entities") != "") \
     .groupBy("entities") \
-    .count()
+    .count() \
+    .selectExpr("to_json(struct(*)) AS value")
 
-# Write the named entities count to Kafka
+# Write the named entities count to Kafka topic2
 query = df_ner \
-    .selectExpr("CAST(entities AS STRING) AS key", "CAST(count AS STRING) AS value") \
     .writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \

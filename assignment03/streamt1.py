@@ -8,7 +8,7 @@ from newsapi import NewsApiClient
 logging.basicConfig(level=logging.INFO)
 
 # Set News API key directly
-NEWS_API_KEY = '670c36ccfaac4136836b803f727940f3'
+NEWS_API_KEY = '6768505531c345ba867952c887f179b9'
 
 # Initialize News API client
 newsapi = NewsApiClient(api_key=NEWS_API_KEY)

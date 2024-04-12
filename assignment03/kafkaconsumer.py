@@ -1,5 +1,6 @@
 import logging
 import threading
+import json
 from kafka import KafkaConsumer
 
 # Initialize logging
@@ -13,11 +14,18 @@ def consume_messages():
         auto_offset_reset='earliest',
         enable_auto_commit=True,
         group_id='group1',
-        value_deserializer=lambda x: x.decode('utf-8')
+        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+        key_deserializer=lambda x: x.decode('utf-8') if x else None  # Handle None key
     )
 
     for message in consumer:
-        logging.info(f"Key: {message.key.decode()}, Value: {message.value}")
+        value = message.value if message.value is not None else "None"
+        if value != "None":
+            entity = value['entities']
+            count = value['count']
+            logging.info(f"Entity: {entity}, Count: {count}")
+
+
 
 if __name__ == "__main__":
     # Create and start the consumer thread
